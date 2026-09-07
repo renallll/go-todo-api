@@ -2,142 +2,105 @@ package handlers
 
 import (
 	"net/http"
-	"sort"
-	"strconv"
+
+	"todo-api/database"
 	"todo-api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Data sementara (in-memory)
-var tasks = []models.Task{
-	{
-		ID:        1,
-		Title:     "Belajar Golang",
-		Completed: false,
-	},
-	{
-		ID:        2,
-		Title:     "Belajar Gin",
-		Completed: true,
-	},
-}
-
-var nextID = 3
-
 // GET /tasks
 func GetTasks(c *gin.Context) {
+	var tasks []models.Task
 
-	// Buat salinan slice agar data asli tidak berubah
-	filteredTasks := make([]models.Task, len(tasks))
-	copy(filteredTasks, tasks)
-
-	// Ambil query parameter
-	completed := c.Query("completed")
-
-	// Filter jika ada query parameter
-	if completed != "" {
-
-		var result []models.Task
-
-		isCompleted := completed == "true"
-
-		for _, task := range filteredTasks {
-			if task.Completed == isCompleted {
-				result = append(result, task)
-			}
-		}
-
-		filteredTasks = result
+	if err := database.DB.Order("id DESC").Find(&tasks).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal mengambil data",
+		})
+		return
 	}
 
-	// Urutkan ID terbesar ke terkecil
-	sort.Slice(filteredTasks, func(i, j int) bool {
-		return filteredTasks[i].ID > filteredTasks[j].ID
-	})
-
-	c.JSON(http.StatusOK, filteredTasks)
+	c.JSON(http.StatusOK, tasks)
 }
 
 // GET /tasks/:id
 func GetTaskByID(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	id := c.Param("id")
 
-	for _, task := range tasks {
-		if task.ID == id {
-			c.JSON(http.StatusOK, task)
-			return
-		}
+	var task models.Task
+
+	if err := database.DB.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "Task tidak ditemukan",
+		})
+		return
 	}
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
-	})
+	c.JSON(http.StatusOK, task)
 }
 
 // POST /tasks
 func CreateTask(c *gin.Context) {
-	var newTask models.Task
+	var task models.Task
 
-	if err := c.ShouldBindJSON(&newTask); err != nil {
+	if err := c.ShouldBindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	newTask.ID = nextID
-	nextID++
+	database.DB.Create(&task)
 
-	tasks = append(tasks, newTask)
-
-	c.JSON(http.StatusCreated, newTask)
+	c.JSON(http.StatusCreated, task)
 }
 
 // PUT /tasks/:id
 func UpdateTask(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	id := c.Param("id")
 
-	var updated models.Task
+	var task models.Task
 
-	if err := c.ShouldBindJSON(&updated); err != nil {
+	if err := database.DB.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "Task tidak ditemukan",
+		})
+		return
+	}
+
+	var input models.Task
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	for i, task := range tasks {
-		if task.ID == id {
-			updated.ID = id
-			tasks[i] = updated
+	task.Title = input.Title
+	task.Completed = input.Completed
 
-			c.JSON(http.StatusOK, updated)
-			return
-		}
-	}
+	database.DB.Save(&task)
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
-	})
+	c.JSON(http.StatusOK, task)
 }
 
 // DELETE /tasks/:id
 func DeleteTask(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	id := c.Param("id")
 
-	for i, task := range tasks {
-		if task.ID == id {
-			tasks = append(tasks[:i], tasks[i+1:]...)
+	var task models.Task
 
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Task berhasil dihapus",
-			})
-			return
-		}
+	if err := database.DB.First(&task, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"message": "Task tidak ditemukan",
+		})
+		return
 	}
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
+	database.DB.Delete(&task)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Task berhasil dihapus",
 	})
 }
