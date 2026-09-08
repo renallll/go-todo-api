@@ -1,12 +1,14 @@
 package main
 
 import (
+	"todo-api/database"
 	"todo-api/routes"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	database.ConnectDatabase() // WAJIB sebelum router
 
 	router := gin.Default()
 

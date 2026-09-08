@@ -33,8 +33,11 @@ func ConnectDatabase() {
 
 	DB = db
 
-	err = DB.AutoMigrate(&models.Task{})
-	if err != nil {
+	if DB == nil {
+		log.Fatal("Database belum terinisialisasi")
+	}
+
+	if err := DB.AutoMigrate(&models.User{}, &models.Task{}); err != nil {
 		log.Fatal("Gagal migrate:", err)
 	}
 
