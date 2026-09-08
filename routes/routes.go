@@ -2,6 +2,7 @@ package routes
 
 import (
 	"todo-api/handlers"
+	"todo-api/middleware"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,10 +14,14 @@ func SetupRoutes(r *gin.Engine) {
 			"message": "Todo API berjalan",
 		})
 	})
+	r.POST("/register", handlers.Register)
+	r.POST("/login", handlers.Login)
+	protected := r.Group("/")
+	protected.Use(middleware.AuthMiddleware())
 
-	r.GET("/tasks", handlers.GetTasks)
-	r.GET("/tasks/:id", handlers.GetTaskByID)
-	r.POST("/tasks", handlers.CreateTask)
-	r.PUT("/tasks/:id", handlers.UpdateTask)
-	r.DELETE("/tasks/:id", handlers.DeleteTask)
+	protected.GET("/tasks", handlers.GetTasks)
+	protected.GET("/tasks/:id", handlers.GetTaskByID)
+	protected.POST("/tasks", handlers.CreateTask)
+	protected.PUT("/tasks/:id", handlers.UpdateTask)
+	protected.DELETE("/tasks/:id", handlers.DeleteTask)
 }
