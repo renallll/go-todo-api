@@ -5,31 +5,62 @@ import (
 
 	"todo-api/database"
 	"todo-api/models"
+	"todo-api/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-// GET /tasks
+type CreateTaskInput struct {
+	Title     string `json:"title" example:"Belajar Go"`
+	Completed bool   `json:"completed" example:"false"`
+}
+
+type UpdateTaskInput struct {
+	Title     string `json:"title" example:"Belajar Swagger"`
+	Completed bool   `json:"completed" example:"true"`
+}
+
+type TaskResponse struct {
+	ID        uint   `json:"id" example:"1"`
+	Title     string `json:"title" example:"Belajar Go"`
+	Completed bool   `json:"completed" example:"false"`
+	UserID    uint   `json:"user_id" example:"1"`
+}
+
+// GetTasks godoc
+// @Summary Get semua task
+// @Description Mengambil semua task milik user yang sedang login
+// @Tags Task
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} TaskResponse
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /tasks [get]
 func GetTasks(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
-	var tasks []models.Task
+	service := services.TaskService{}
 
-	if err := database.DB.
-		Where("user_id = ?", userID).
-		Order("id DESC").
-		Find(&tasks).Error; err != nil {
-
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Gagal mengambil task",
-		})
+	tasks, err := service.GetTasks(userID.(uint))
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Gagal mengambil task"})
 		return
 	}
 
-	c.JSON(http.StatusOK, tasks)
+	c.JSON(200, tasks)
 }
 
-// GET /tasks/:id
+// @Summary Get task berdasarkan ID
+// @Description Mengambil satu task berdasarkan ID milik user yang sedang login
+// @Tags Task
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Task ID"
+// @Success 200 {object} TaskResponse
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /tasks/{id} [get]
 func GetTaskByID(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
@@ -49,7 +80,19 @@ func GetTaskByID(c *gin.Context) {
 	c.JSON(http.StatusOK, task)
 }
 
-// POST /tasks
+// CreateTask godoc
+// @Summary Membuat task baru
+// @Description Membuat task baru untuk user yang sedang login
+// @Tags Task
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body CreateTaskInput true "Task"
+// @Success 201 {object} TaskResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /tasks [post]
 func CreateTask(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
@@ -75,6 +118,20 @@ func CreateTask(c *gin.Context) {
 }
 
 // PUT /tasks/:id
+// UpdateTask godoc
+// @Summary Update task
+// @Description Mengubah task milik user yang sedang login
+// @Tags Task
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Task ID"
+// @Param body body UpdateTaskInput true "Task"
+// @Success 200 {object} TaskResponse
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /tasks/{id} [put]
 func UpdateTask(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
@@ -108,7 +165,17 @@ func UpdateTask(c *gin.Context) {
 	c.JSON(http.StatusOK, task)
 }
 
-// DELETE /tasks/:id
+// DeleteTask godoc
+// @Summary Hapus task
+// @Description Menghapus task milik user yang sedang login
+// @Tags Task
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Task ID"
+// @Success 200 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 403 {object} map[string]string
+// @Router /tasks/{id} [delete]
 func DeleteTask(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
