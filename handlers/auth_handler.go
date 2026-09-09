@@ -22,6 +22,15 @@ type LoginInput struct {
 	Password string `json:"password" binding:"required"`
 }
 
+// Register godoc
+// @Summary Register user baru
+// @Description Membuat akun baru
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body RegisterInput true "Register"
+// @Success 201 {object} map[string]interface{}
+// @Router /register [post]
 func Register(c *gin.Context) {
 
 	var input RegisterInput
@@ -63,6 +72,18 @@ func Register(c *gin.Context) {
 	})
 }
 
+// Login godoc
+// @Summary Login user
+// @Description Login menggunakan email dan password untuk mendapatkan JWT token
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param body body LoginInput true "Login"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 500 {object} map[string]string
+// @Router /login [post]
 func Login(c *gin.Context) {
 
 	var input LoginInput
