@@ -2,142 +2,132 @@ package handlers
 
 import (
 	"net/http"
-	"sort"
-	"strconv"
+
+	"todo-api/database"
 	"todo-api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-// Data sementara (in-memory)
-var tasks = []models.Task{
-	{
-		ID:        1,
-		Title:     "Belajar Golang",
-		Completed: false,
-	},
-	{
-		ID:        2,
-		Title:     "Belajar Gin",
-		Completed: true,
-	},
-}
-
-var nextID = 3
-
 // GET /tasks
 func GetTasks(c *gin.Context) {
+	userID, _ := c.Get("user_id")
 
-	// Buat salinan slice agar data asli tidak berubah
-	filteredTasks := make([]models.Task, len(tasks))
-	copy(filteredTasks, tasks)
+	var tasks []models.Task
 
-	// Ambil query parameter
-	completed := c.Query("completed")
+	if err := database.DB.
+		Where("user_id = ?", userID).
+		Order("id DESC").
+		Find(&tasks).Error; err != nil {
 
-	// Filter jika ada query parameter
-	if completed != "" {
-
-		var result []models.Task
-
-		isCompleted := completed == "true"
-
-		for _, task := range filteredTasks {
-			if task.Completed == isCompleted {
-				result = append(result, task)
-			}
-		}
-
-		filteredTasks = result
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal mengambil task",
+		})
+		return
 	}
 
-	// Urutkan ID terbesar ke terkecil
-	sort.Slice(filteredTasks, func(i, j int) bool {
-		return filteredTasks[i].ID > filteredTasks[j].ID
-	})
-
-	c.JSON(http.StatusOK, filteredTasks)
+	c.JSON(http.StatusOK, tasks)
 }
 
 // GET /tasks/:id
 func GetTaskByID(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	userID, _ := c.Get("user_id")
+	id := c.Param("id")
 
-	for _, task := range tasks {
-		if task.ID == id {
-			c.JSON(http.StatusOK, task)
-			return
-		}
+	var task models.Task
+
+	if err := database.DB.
+		Where("id = ? AND user_id = ?", id, userID).
+		First(&task).Error; err != nil {
+
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "Task tidak ditemukan atau bukan milik Anda",
+		})
+		return
 	}
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
-	})
+	c.JSON(http.StatusOK, task)
 }
 
 // POST /tasks
 func CreateTask(c *gin.Context) {
-	var newTask models.Task
+	userID, _ := c.Get("user_id")
 
-	if err := c.ShouldBindJSON(&newTask); err != nil {
+	var task models.Task
+
+	if err := c.ShouldBindJSON(&task); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	newTask.ID = nextID
-	nextID++
+	task.UserID = userID.(uint)
 
-	tasks = append(tasks, newTask)
+	if err := database.DB.Create(&task).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal membuat task",
+		})
+		return
+	}
 
-	c.JSON(http.StatusCreated, newTask)
+	c.JSON(http.StatusCreated, task)
 }
 
 // PUT /tasks/:id
 func UpdateTask(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	userID, _ := c.Get("user_id")
+	id := c.Param("id")
 
-	var updated models.Task
+	var task models.Task
 
-	if err := c.ShouldBindJSON(&updated); err != nil {
+	if err := database.DB.
+		Where("id = ? AND user_id = ?", id, userID).
+		First(&task).Error; err != nil {
+
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "Task tidak ditemukan atau bukan milik Anda",
+		})
+		return
+	}
+
+	var input models.Task
+
+	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
-	for i, task := range tasks {
-		if task.ID == id {
-			updated.ID = id
-			tasks[i] = updated
+	task.Title = input.Title
+	task.Completed = input.Completed
 
-			c.JSON(http.StatusOK, updated)
-			return
-		}
-	}
+	database.DB.Save(&task)
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
-	})
+	c.JSON(http.StatusOK, task)
 }
 
 // DELETE /tasks/:id
 func DeleteTask(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
+	userID, _ := c.Get("user_id")
+	id := c.Param("id")
 
-	for i, task := range tasks {
-		if task.ID == id {
-			tasks = append(tasks[:i], tasks[i+1:]...)
+	var task models.Task
 
-			c.JSON(http.StatusOK, gin.H{
-				"message": "Task berhasil dihapus",
-			})
-			return
-		}
+	if err := database.DB.
+		Where("id = ? AND user_id = ?", id, userID).
+		First(&task).Error; err != nil {
+
+		c.JSON(http.StatusForbidden, gin.H{
+			"message": "Task tidak ditemukan atau bukan milik Anda",
+		})
+		return
 	}
 
-	c.JSON(http.StatusNotFound, gin.H{
-		"message": "Task tidak ditemukan",
+	database.DB.Delete(&task)
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Task berhasil dihapus",
 	})
 }
