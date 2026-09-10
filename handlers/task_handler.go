@@ -3,8 +3,8 @@ package handlers
 import (
 	"net/http"
 
-	"todo-api/database"
 	"todo-api/models"
+	"todo-api/repositories"
 	"todo-api/services"
 
 	"github.com/gin-gonic/gin"
@@ -40,15 +40,18 @@ type TaskResponse struct {
 func GetTasks(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 
-	service := services.TaskService{}
+	repo := repositories.TaskRepository{}
+	service := services.NewTaskService(&repo)
 
 	tasks, err := service.GetTasks(userID.(uint))
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Gagal mengambil task"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal mengambil task",
+		})
 		return
 	}
 
-	c.JSON(200, tasks)
+	c.JSON(http.StatusOK, tasks)
 }
 
 // @Summary Get task berdasarkan ID
@@ -65,12 +68,11 @@ func GetTaskByID(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
 
-	var task models.Task
+	repo := repositories.TaskRepository{}
+	service := services.NewTaskService(&repo)
 
-	if err := database.DB.
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&task).Error; err != nil {
-
+	task, err := service.GetTask(id, userID.(uint))
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{
 			"message": "Task tidak ditemukan atau bukan milik Anda",
 		})
@@ -107,7 +109,10 @@ func CreateTask(c *gin.Context) {
 
 	task.UserID = userID.(uint)
 
-	if err := database.DB.Create(&task).Error; err != nil {
+	repo := repositories.TaskRepository{}
+	service := services.NewTaskService(&repo)
+
+	if err := service.CreateTask(&task); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Gagal membuat task",
 		})
@@ -136,12 +141,11 @@ func UpdateTask(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
 
-	var task models.Task
+	repo := repositories.TaskRepository{}
+	service := services.NewTaskService(&repo)
 
-	if err := database.DB.
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&task).Error; err != nil {
-
+	task, err := service.GetTask(id, userID.(uint))
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{
 			"message": "Task tidak ditemukan atau bukan milik Anda",
 		})
@@ -160,7 +164,12 @@ func UpdateTask(c *gin.Context) {
 	task.Title = input.Title
 	task.Completed = input.Completed
 
-	database.DB.Save(&task)
+	if err := service.UpdateTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal mengupdate task",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, task)
 }
@@ -180,19 +189,23 @@ func DeleteTask(c *gin.Context) {
 	userID, _ := c.Get("user_id")
 	id := c.Param("id")
 
-	var task models.Task
+	repo := repositories.TaskRepository{}
+	service := services.NewTaskService(&repo)
 
-	if err := database.DB.
-		Where("id = ? AND user_id = ?", id, userID).
-		First(&task).Error; err != nil {
-
+	task, err := service.GetTask(id, userID.(uint))
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{
 			"message": "Task tidak ditemukan atau bukan milik Anda",
 		})
 		return
 	}
 
-	database.DB.Delete(&task)
+	if err := service.DeleteTask(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Gagal menghapus task",
+		})
+		return
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Task berhasil dihapus",
