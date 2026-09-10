@@ -2,11 +2,22 @@ package services
 
 import (
 	"todo-api/models"
-	"todo-api/repositories"
 )
 
+type TaskRepository interface {
+	GetByUser(userID uint) ([]models.Task, error)
+	GetByID(id string, userID uint) (*models.Task, error)
+	Create(task *models.Task) error
+	Update(task *models.Task) error
+	Delete(task *models.Task) error
+}
+
 type TaskService struct {
-	Repo repositories.TaskRepository
+	Repo TaskRepository
+}
+
+func NewTaskService(repo TaskRepository) *TaskService {
+	return &TaskService{Repo: repo}
 }
 
 func (s *TaskService) GetTasks(userID uint) ([]models.Task, error) {
