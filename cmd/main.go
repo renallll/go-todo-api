@@ -10,6 +10,8 @@
 package main
 
 import (
+	"os"
+
 	"todo-api/database"
 	_ "todo-api/docs"
 	"todo-api/routes"
@@ -20,9 +22,17 @@ import (
 )
 
 func main() {
-	database.ConnectDatabase() // WAJIB sebelum router
+	database.ConnectDatabase()
+
+	// Otomatis Release Mode jika GIN_MODE=release
+	if os.Getenv("GIN_MODE") == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	router := gin.Default()
+
+	// Hindari warning trusted proxies
+	router.SetTrustedProxies(nil)
 
 	routes.SetupRoutes(router)
 
